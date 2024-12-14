@@ -1,5 +1,7 @@
+import matplotlib
 import numpy
 import scipy
+import sklearn.metrics
 from sympy import symbols, diff, lambdify, sympify
 import matplotlib.pyplot as plt
 
@@ -508,6 +510,81 @@ def markovChain():
         current_state = numpy.dot(current_state, transition_matrix)
         print(f"Step {step}: {dict(zip(states, current_state))}")
 
+def curveFitting():
+    # Define models
+    def linear(x, a, b):
+        return a * x + b
+
+    def quadratic(x, a, b, c):
+        return a * x**2 + b * x + c
+
+    def exponential(x, a, b):
+        return a * numpy.exp(b * x)
+
+    # Generate base dataset (quadratic with noise)
+    numpy.random.seed(42)
+    x_data = numpy.linspace(0, 10, 100)
+    y_data = 2 * x_data**2 - 3 * x_data + 5 + numpy.random.normal(0, 5, len(x_data))
+
+    # Monte Carlo parameters
+    n_simulations = 100  # Number of simulations
+    noise_std = 3        # Standard deviation of noise
+
+    # Store results for analysis
+    monte_carlo_results = {model_name: [] for model_name in ["Linear", "Quadratic", "Exponential"]}
+
+    # Perform Monte Carlo simulation
+    for _ in range(n_simulations):
+        # Add random noise to the original data
+        y_noisy = y_data + numpy.random.normal(0, noise_std, size=y_data.shape)
+
+        # Fit each model to the noisy data
+        for name, model in {"Linear": linear, "Quadratic": quadratic, "Exponential": exponential}.items():
+            try:
+                params, _ = scipy.optimize.curve_fit(model, x_data, y_noisy, maxfev=10000)
+                y_pred = model(x_data, *params)
+                avg_distance = sklearn.metrics.mean_absolute_error(y_noisy, y_pred)
+                monte_carlo_results[name].append(avg_distance)
+            except RuntimeError:
+                monte_carlo_results[name].append(numpy.inf)
+
+    # Analyze the results
+    average_distances = {name: numpy.mean(distances) for name, distances in monte_carlo_results.items()}
+    best_model_name = min(average_distances, key=average_distances.get)
+
+    # Fit the best model to the original data
+    best_model = {"Linear": linear, "Quadratic": quadratic, "Exponential": exponential}[best_model_name]
+    params, _ = scipy.optimize.curve_fit(best_model, x_data, y_data, maxfev=10000)
+    y_best_fit = best_model(x_data, *params)
+
+    # Generate the equation string
+    if best_model_name == "Linear":
+        equation = f"y = {params[0]:.4f}x + {params[1]:.4f}"
+    elif best_model_name == "Quadratic":
+        equation = f"y = {params[0]:.4f}x^2 + {params[1]:.4f}x + {params[2]:.4f}"
+    elif best_model_name == "Exponential":
+        equation = f"y = {params[0]:.4f} * exp({params[1]:.4f}x)"
+
+    # Plot the original data and best-fit curve
+    matplotlib.pyplot.figure(figsize=(10, 6))
+    matplotlib.pyplot.scatter(x_data, y_data, label='Original Data', color='black', s=15)
+    matplotlib.pyplot.plot(x_data, y_best_fit, label=f'{best_model_name} Fit (Best)', color='red', linewidth=2)
+    matplotlib.pyplot.title("Best Fit Curve with Monte Carlo Simulation")
+    matplotlib.pyplot.xlabel("X")
+    matplotlib.pyplot.ylabel("Y")
+    matplotlib.pyplot.legend()
+    matplotlib.pyplot.grid(True)
+    matplotlib.pyplot.text(0.6, 0.1, f"Best Fit Equation:\n{equation}", transform=matplotlib.pyplot.gca().transAxes,
+                       fontsize=10, bbox=dict(facecolor='white', alpha=0.7))
+    matplotlib.pyplot.show()
+
+    # Print the Monte Carlo results
+    print("Monte Carlo Simulation Results:")
+    for name, avg_dist in average_distances.items():
+        print(f"Model: {name}, Average Distance: {avg_dist:.4f}")
+    print(f"Best Model Based on Monte Carlo: {best_model_name}")
+    print(f"Best Fit Equation: {equation}")
+
 # Menu
 def menu():
     print("\n=== Operation Menu ===")
@@ -533,6 +610,8 @@ def menu():
     print("\n=== Simulation ===")
     print("18. Monte Carlo")
     print("19. Markov Chain")
+    print("\n=== Implementation ===")
+    print("20. Curve Fitting")
     print("0. Exit")
 
 # Main
@@ -560,6 +639,8 @@ def main():
             16: secantMethod,
             17: gaussElimination,
             18: monteCarlo,
+            19: markovChain,
+            20: curveFitting,
             0: lambda: print("Exiting...") or exit()
         }
         
